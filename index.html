@@ -110,6 +110,9 @@
     .btn-save:disabled { background:#cfd6dd; color:#4a5568; box-shadow:none; cursor:default; transform:none; }
     .btn-retry { border:2px solid rgba(255,255,255,.6); background:rgba(255,255,255,.14); color:#fff; }
     .btn-retry:hover { background:rgba(255,255,255,.26); }
+    .btn-retry.next { border:0; background:#10b99a; color:#fff; box-shadow:0 6px 0 #0a8a72, 0 12px 20px rgba(16,25,50,.25); }
+    .btn-retry.next:hover { background:#14cfab; }
+    .btn-retry.next:active { transform:translateY(4px); box-shadow:0 2px 0 #0a8a72; }
 
     .start-guide { position:fixed; inset:0; display:none; align-items:center; justify-content:center; padding:24px; background:rgba(5,12,25,.72); backdrop-filter:blur(7px); z-index:1000; }
     .start-guide.show { display:flex; }
@@ -191,7 +194,7 @@
             </div>
             <div class="result-actions">
               <button id="saveButton" class="btn-save" type="button">💾 기록 저장</button>
-              <button id="restartBtn" class="btn-retry" type="button">🔁 다시 도전</button>
+              <button id="restartBtn" class="btn-retry" type="button">⏭ 저장 안 하고 넘기기</button>
             </div>
             <div class="fs-tip" style="margin-top:8px">Tip: "전체 화면" 버튼으로 몰입도를 높이세요.</div>
           </div>
@@ -453,13 +456,14 @@
       awaitingReady = true; readyStart = 0; lastReadyTick = 0;
     };
 
-    // 다시 도전: 새로고침 없이 재시작 + 저장 입력칸 다시 활성화
+    // 저장 안 하고 넘기기 / 다음 학생: 결과 창을 닫고 다음 학생 준비 (학반·이름 칸 비움)
     restartBtn.onclick = () => {
+      if (!saveDone && !confirm('기록을 저장하지 않고 다음 학생으로 넘어갈까요?')) return;
       gameOver.style.display = 'none';
       confetti.length = 0;
-      // 기록을 저장했다면 다음 학생 차례이므로 학반·이름 칸을 비웁니다.
-      if (saveDone) { studentId.value = ''; studentName.value = ''; }
+      studentId.value = ''; studentName.value = '';
       resetSaveUi();
+      document.getElementById('fsStartLabel').textContent = '게임 시작';
       stimBtn.click();
     };
 
@@ -493,7 +497,7 @@
 
     fsStartBtn.onclick = () => {
       if (stimBtn.disabled) return;
-      // 결과 창이 떠 있으면 '다시 도전'과 동일하게 처리 (저장 입력칸 초기화 포함)
+      // 결과 창이 떠 있으면 결과 창의 '넘기기/다음 학생' 버튼과 동일하게 처리
       if (gameOver.style.display === 'flex') restartBtn.click();
       else stimBtn.click();
     };
@@ -679,6 +683,7 @@
       if (score > 0) spawnConfetti();
       fitResultLayout();
       loadRanking(null); // 결과 창 오른쪽에 TOP 10 + 예상 순위 표시
+      document.getElementById('fsStartLabel').textContent = '다음 학생';
     }
 
     function countUp(el, to, dur){
@@ -694,8 +699,10 @@
     let saveDone = false; // 이번 결과를 저장했는지 (저장 후엔 '다음 학생' 모드)
     function setNextMode(on){
       saveDone = on;
-      restartBtn.textContent = on ? '👉 다음 학생' : '🔁 다시 도전';
-      document.getElementById('fsStartLabel').textContent = on ? '다음 학생' : '게임 시작';
+      // 저장 전: [💾 기록 저장] [⏭ 저장 안 하고 넘기기]  →  저장 후: [▶ 다음 학생] 하나만
+      saveButton.style.display = on ? 'none' : '';
+      restartBtn.textContent = on ? '▶ 다음 학생' : '⏭ 저장 안 하고 넘기기';
+      restartBtn.classList.toggle('next', on);
     }
     function resetSaveUi(){
       studentId.disabled = false; studentName.disabled = false;
