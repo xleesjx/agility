@@ -330,6 +330,9 @@
     const HAND_RADIUS_RATIO = 0.28; // 손/발 판정 원의 크기 (몸 크기 대비 비율)
     const VIS_MIN = 0.08;       // 랜드마크 최소 신뢰도 (2m 거리에서는 낮게 나와서 완화)
     const SPAWN_GAP = 0.10;     // 타겟이 손/발에서 최소 이만큼(화면 너비 비율) 떨어져서 생성
+    const STAND_ZONE = [0.32, 0.68]; // 처음 인식할 때 '서는 자리' (화면 가로 비율). 이 안에 선 사람만 플레이어로 인식
+    const FOLLOW_MAX = 0.25;    // 게임 중 같은 학생으로 볼 최대 이동 거리 (한 프레임, 화면 높이 비율)
+    const LOST_GRACE_MS = 1000; // 학생을 잠깐 놓쳐도 이 시간 동안은 같은 학생을 다시 찾음
 
     const CANVAS_FONT = '"Pretendard Variable", Pretendard, system-ui, "Malgun Gothic", sans-serif';
     const video = document.getElementById('video');
@@ -494,6 +497,7 @@
       if (!studentId.value.trim()) { alert('학반을 입력하세요! (예: 4-3)'); studentId.focus(); return; }
       if (!studentName.value.trim()) { alert('이름을 입력하세요!'); studentName.focus(); return; }
       startGuide.classList.remove('show');
+      pickedHip = null; // 새 학생: 가운데 '서는 자리'에 선 사람을 새로 찾음
       awaitingReady = true; readyStart = 0; lastReadyTick = 0;
     };
     // 입력칸에서 Enter: 학반 → 이름 → 시작
@@ -664,7 +668,7 @@
       // 더 정확한 인식이 필요하고 PC 성능이 충분하면 아래 주소의 lite 를 full 로 바꾸세요 (두 군데).
       const modelAssetPath = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
       const common = {
-        numPoses: 3, // 여러 명을 감지한 뒤 가장 가까운(크게 보이는) 사람을 고릅니다
+        numPoses: 3, // 여러 명을 감지한 뒤 '서는 자리' 안의 학생을 골라 따라갑니다
         runningMode: "VIDEO",
         minPoseDetectionConfidence: 0.5,
         minPosePresenceConfidence: 0.5,
@@ -891,20 +895,23 @@
         lastVideoTime = video.currentTime;
         const result = landmarker.detectForVideo(video, now);
         fresh = true;
-        if (result?.landmarks?.length){
-          pts = getKeyPoints(pickPlayer(result.landmarks));
+        const chosen = result?.landmarks?.length ? pickPlayer(result.landmarks, now) : null;
+        if (chosen){
+          pts = getKeyPoints(chosen);
           updateBodyScale(pts);
           updateTrackers(pts, now);
         } else {
           pts = null;
           resetTrackers();
-          pickedHip = null;
+          if (now - lastPickAt > LOST_GRACE_MS) pickedHip = null; // 오래 놓치면 '서는 자리'에서 새로 찾기
         }
       }
 
       // 배경 초기화
       ctx.clearRect(0,0,STAGE_W,STAGE_H);
 
+      // 준비 중: 가운데 '서는 자리' 테두리 + 실루엣
+      if (awaitingReady) drawStandGuide(!!pts);
       // 지금 인식 중인 사람 표시 (준비 중에는 진하게, 게임 중에는 옅게)
       if (pts) drawSkeleton(pts, awaitingReady);
 
@@ -968,26 +975,75 @@
       loopReq = requestAnimationFrame(loop);
     }
 
-    // ===== 플레이어 선택: 카메라에 여러 명이 잡히면 가장 가까운(크게 보이는) 사람 =====
-    let pickedHip = null; // 직전에 고른 사람의 골반 중심 (정규화 좌표)
+    // ===== 플레이어 선택 =====
+    // 1) 새로 찾을 때: 화면 가운데 '서는 자리' 안에 선 사람 중 가운데에 가장 가까운 사람
+    // 2) 게임 중: 방금 따라가던 학생과 같은 위치(가장 가까운 골반 위치)의 사람을 계속 따라감
+    //    → 옆 자리 학생이 더 가까이 와도 바뀌지 않고, 타겟을 따라 옆으로 움직여도 놓치지 않음
+    let pickedHip = null, lastPickAt = 0;
     function hipOf(lm){ return { x:(lm[23].x + lm[24].x) / 2, y:(lm[23].y + lm[24].y) / 2 }; }
-    function sizeOf(lm, ar){
-      const sw = Math.hypot((lm[11].x - lm[12].x) * ar, lm[11].y - lm[12].y);
-      const torso = Math.hypot(((lm[11].x + lm[12].x) / 2 - (lm[23].x + lm[24].x) / 2) * ar, (lm[11].y + lm[12].y) / 2 - (lm[23].y + lm[24].y) / 2);
-      return torso + sw * 0.5;
-    }
-    function pickPlayer(all){
-      if (all.length === 1) { pickedHip = hipOf(all[0]); return all[0]; }
+    function pickPlayer(all, now){
       const ar = (video.videoWidth && video.videoHeight) ? video.videoWidth / video.videoHeight : 16 / 9;
-      let best = all[0], bestScore = -1;
-      for (const lm of all){
-        let score = sizeOf(lm, ar);
-        // 방금까지 따라가던 사람은 조금 우대 → 비슷한 크기의 두 사람 사이에서 왔다 갔다 하지 않도록
-        if (pickedHip){ const h = hipOf(lm); if (Math.hypot((h.x - pickedHip.x) * ar, h.y - pickedHip.y) < 0.15) score *= 1.25; }
-        if (score > bestScore){ best = lm; bestScore = score; }
+      let best = null, bestD = Infinity;
+      if (pickedHip){
+        for (const lm of all){
+          const h = hipOf(lm), d = Math.hypot((h.x - pickedHip.x) * ar, h.y - pickedHip.y);
+          if (d < bestD){ best = lm; bestD = d; }
+        }
+        if (!best || bestD > FOLLOW_MAX) return null;
+      } else {
+        for (const lm of all){
+          const h = hipOf(lm);
+          if (h.x < STAND_ZONE[0] || h.x > STAND_ZONE[1]) continue; // 서는 자리 밖은 무시
+          const d = Math.abs(h.x - 0.5);
+          if (d < bestD){ best = lm; bestD = d; }
+        }
+        if (!best) return null;
       }
-      pickedHip = hipOf(best);
+      pickedHip = hipOf(best); lastPickAt = now;
       return best;
+    }
+
+    // 서는 자리 안내: 가운데 점선 테두리 + 사람 실루엣 (인식되면 초록색)
+    let silCanvas = null, silKey = '';
+    function drawStandGuide(found){
+      const x0 = STAGE_W * STAND_ZONE[0], x1 = STAGE_W * STAND_ZONE[1];
+      const y0 = STAGE_H * 0.04, y1 = STAGE_H * 0.96, w = x1 - x0, h = y1 - y0;
+      const S = uiScale(), col = found ? '57,255,140' : '255,255,255';
+      ctx.save();
+      ctx.fillStyle = `rgba(${col},${found ? 0.07 : 0.05})`;
+      roundRect(ctx, x0, y0, w, h, 28 * S); ctx.fill();
+      ctx.setLineDash([16 * S, 12 * S]); ctx.lineWidth = 4 * S;
+      ctx.strokeStyle = `rgba(${col},${found ? 0.9 : 0.6})`;
+      roundRect(ctx, x0, y0, w, h, 28 * S); ctx.stroke();
+      ctx.setLineDash([]);
+
+      // 실루엣은 별도 캔버스에 한 번 그려 두고 반투명으로 얹음 (겹침 없이 깔끔하게)
+      const H = h * 0.86, key = `${Math.round(H)}`;
+      if (silKey !== key){
+        silKey = key; silCanvas = document.createElement('canvas');
+        silCanvas.width = Math.ceil(H * 0.5); silCanvas.height = Math.ceil(H);
+        const c = silCanvas.getContext('2d'), cx = silCanvas.width / 2;
+        c.fillStyle = c.strokeStyle = '#fff'; c.lineCap = 'round'; c.lineJoin = 'round';
+        c.beginPath(); c.arc(cx, H * 0.08, H * 0.065, 0, Math.PI * 2); c.fill();               // 머리
+        c.lineWidth = H * 0.13; c.beginPath(); c.moveTo(cx, H * 0.24); c.lineTo(cx, H * 0.5); c.stroke(); // 몸통
+        c.lineWidth = H * 0.05;
+        c.beginPath(); c.moveTo(cx - H * 0.07, H * 0.22); c.lineTo(cx - H * 0.13, H * 0.5); c.stroke(); // 팔
+        c.beginPath(); c.moveTo(cx + H * 0.07, H * 0.22); c.lineTo(cx + H * 0.13, H * 0.5); c.stroke();
+        c.lineWidth = H * 0.06;
+        c.beginPath(); c.moveTo(cx - H * 0.04, H * 0.52); c.lineTo(cx - H * 0.06, H * 0.96); c.stroke(); // 다리
+        c.beginPath(); c.moveTo(cx + H * 0.04, H * 0.52); c.lineTo(cx + H * 0.06, H * 0.96); c.stroke();
+      }
+      ctx.globalAlpha = found ? 0.10 : 0.16;
+      ctx.drawImage(silCanvas, (x0 + x1) / 2 - silCanvas.width / 2, y0 + (h - H) / 2);
+      ctx.globalAlpha = 1;
+
+      ctx.font = `800 ${Math.max(15, 22 * S)}px ${CANVAS_FONT}`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+      const label = found ? '✓ 인식됐어요! 그대로 서 있어요' : '이 테두리 안에 서 주세요';
+      const ly = y1 - 26 * S;
+      ctx.lineWidth = 6 * S; ctx.strokeStyle = 'rgba(10,16,32,.8)'; ctx.strokeText(label, (x0 + x1) / 2, ly);
+      ctx.fillStyle = found ? '#7dffb0' : '#ffffff'; ctx.fillText(label, (x0 + x1) / 2, ly);
+      ctx.restore();
     }
 
     // ===== 추적 & 판정 =====
@@ -1317,18 +1373,19 @@
     // 전신 인식 준비 진행 바: 화면 크기에 맞게 중앙 배치 + 남은 초 표시
     function drawReadyProgress(ratio){
       const k = clamp(ratio, 0, 1);
-      const w = Math.min(900, STAGE_W * 0.9);
-      const h = clamp(STAGE_H * 0.15, 44, 90);
+      // 가운데 '서는 자리'와 학생 몸을 가리지 않도록 화면 위쪽에 작게 표시
+      const w = Math.min(640, STAGE_W * 0.62);
+      const h = clamp(STAGE_H * 0.075, 26, 54);
       const x = (STAGE_W - w) / 2;
-      const y = (STAGE_H - h) / 2;
+      const y = hudTopOffset() + STAGE_H * 0.04 + clamp(STAGE_W * 0.04, 20, 46) + 12;
 
       ctx.save();
       ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.lineJoin = 'round';
-      ctx.font = `bold ${clamp(STAGE_W * 0.06, 24, 60)}px ${CANVAS_FONT}`;
+      ctx.font = `800 ${clamp(STAGE_W * 0.04, 20, 46)}px ${CANVAS_FONT}`;
       const label = k > 0 ? `전신 인식 중… ${Math.max(1, Math.ceil(2 * (1 - k)))}` : '전신이 보이도록 서 주세요';
       ctx.lineWidth = 6; ctx.strokeStyle = 'rgba(10,16,32,.75)';
-      ctx.strokeText(label, STAGE_W / 2, y - 14);
-      ctx.fillStyle = '#ffffff'; ctx.fillText(label, STAGE_W / 2, y - 14);
+      ctx.strokeText(label, STAGE_W / 2, y - 12);
+      ctx.fillStyle = '#ffffff'; ctx.fillText(label, STAGE_W / 2, y - 12);
 
       ctx.fillStyle = 'rgba(10,16,32,.55)'; roundRect(ctx, x, y, w, h, h/2); ctx.fill();
       if (k > 0){
