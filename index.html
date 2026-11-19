@@ -26,7 +26,8 @@
     video { position:absolute; inset:0; width:100%; height:100%; object-fit:fill; transform: scaleX(-1); filter: saturate(1.05) contrast(1.05); }
     canvas { position:absolute; inset:0; width:100%; height:100%; }
     .control-panel { flex:1; min-width:310px; display:flex; }
-    .hud { width:100%; display:grid; grid-template-rows:repeat(3, 1fr); gap:14px; }
+    .hud { width:100%; display:grid; grid-template-rows:repeat(4, 1fr); gap:12px; }
+    .btn.recog { background:#b45309; }
     .btn { background:#2563eb; border:none; color:#fff; padding:10px 14px; border-radius:12px; font-weight:700; cursor:pointer; }
     .hud .btn { width:100%; min-height:0; padding:16px 18px; border-radius:15px; font-size:22px; font-weight:800; box-shadow:0 8px 18px rgba(3,10,25,.24); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; transition:filter .15s, transform .15s; }
     .hud .btn:not(:disabled):hover { filter:brightness(1.1); transform:translateY(-1px); }
@@ -75,6 +76,7 @@
     .fs-controls button:active { transform:translateY(1px); }
     .fs-controls .fs-start { background:rgba(15,159,132,.92); }
     .fs-controls .fs-stop { background:rgba(220,55,75,.9); }
+    .fs-controls .fs-recog { background:rgba(217,119,6,.92); }
     .fs-controls .fs-exit { background:rgba(30,45,70,.85); }
     .fs-controls button:disabled { opacity:.4; cursor:not-allowed; filter:none; transform:none; }
 
@@ -160,7 +162,7 @@
       .row { flex-direction:column; }
       #stage { width:calc(100vw - 64px); height:auto; aspect-ratio:16 / 9; }
       .control-panel { width:calc(100% - 24px); }
-      .hud { grid-template-columns:repeat(3, 1fr); grid-template-rows:1fr; }
+      .hud { grid-template-columns:repeat(4, 1fr); grid-template-rows:1fr; }
       .hud .btn { min-height:62px; font-size:18px; flex-direction:row; }
       .hud .btn .ico { font-size:22px; }
     }
@@ -168,7 +170,7 @@
       .wrap { padding:12px; }
       h1 { margin-bottom:12px; }
       #stage { width:calc(100vw - 48px); }
-      .hud { grid-template-columns:1fr; grid-template-rows:repeat(3, 1fr); }
+      .hud { grid-template-columns:1fr 1fr; grid-template-rows:auto; }
       .settings { grid-template-columns:1fr; }
       .stats-grid { grid-template-columns:1fr 1fr; }
       .result-score b { font-size:54px; }
@@ -193,6 +195,9 @@
         <div id="fsControls" class="fs-controls">
           <button id="fsStartBtn" class="fs-start" type="button" disabled title="게임 시작" aria-label="게임 시작">
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5z"/></svg><span id="fsStartLabel">게임 시작</span>
+          </button>
+          <button id="fsRecogBtn" class="fs-recog" type="button" disabled title="같은 학생으로 전신 인식부터 다시" aria-label="다시 인식">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>다시 인식
           </button>
           <button id="fsStopBtn" class="fs-stop" type="button" title="정지" aria-label="정지">
             <svg viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2.5"/></svg>정지
@@ -237,6 +242,7 @@
         <div class="hud">
           <button id="startBtn" class="btn"><span class="ico" aria-hidden="true">📷</span>카메라 시작</button>
           <button id="stimBtn" class="btn secondary" disabled><span class="ico" aria-hidden="true">▶</span>게임 시작</button>
+          <button id="recogBtn" class="btn recog" disabled title="같은 학생으로 전신 인식부터 다시"><span class="ico" aria-hidden="true">↻</span>다시 인식</button>
           <button id="fsBtn" class="btn ghost"><span class="ico" aria-hidden="true">⛶</span>전체 화면</button>
         </div>
       </div>
@@ -532,7 +538,9 @@
     }
 
     // 전체화면 '게임 시작' 버튼은 기존 '게임 시작' 버튼과 활성/비활성 상태를 같이 맞춥니다.
-    const syncFsStart = () => { fsStartBtn.disabled = stimBtn.disabled; };
+    const fsRecogBtn = document.getElementById('fsRecogBtn');
+    const recogBtn = document.getElementById('recogBtn');
+    const syncFsStart = () => { fsStartBtn.disabled = stimBtn.disabled; fsRecogBtn.disabled = stimBtn.disabled; recogBtn.disabled = stimBtn.disabled; };
     new MutationObserver(syncFsStart).observe(stimBtn, { attributes:true, attributeFilter:['disabled'] });
     syncFsStart();
 
@@ -544,6 +552,24 @@
     };
 
     fsStopBtn.onclick = () => { stopGame(); };
+    fsRecogBtn.onclick = () => reRecognize();
+    recogBtn.onclick = () => reRecognize();
+
+    // 다시 인식: 엉뚱한 사람이 잡혔을 때. 이번 판은 기록 없이 취소하고,
+    // 같은 학생(학반·이름 유지)으로 '전신 2초 인식'부터 다시 시작합니다.
+    function reRecognize(){
+      if (!running || gameOver.style.display === 'flex') return;
+      ensureAudio();
+      playing = false; target = null;
+      if (spawnTimer) { clearTimeout(spawnTimer); spawnTimer = null; }
+      if (roundTimerId) { clearInterval(roundTimerId); roundTimerId = null; }
+      timeLeftEl.textContent = '–';
+      pickedHip = null; bodyScale = 0; resetTrackers(); // 따라가던 사람을 잊고 새로 고름
+      if (!studentId.value.trim() || !studentName.value.trim()) { stimBtn.click(); return; } // 이름이 없으면 등록 창부터
+      startGuide.classList.remove('show');
+      awaitingReady = true; readyStart = 0; lastReadyTick = 0;
+      popups.push({ text:'다시 인식합니다', x:STAGE_W/2, y:STAGE_H*0.72, t0:performance.now(), dur:1200, color:'#7dd3fc', size:56 });
+    }
 
     fsExitBtn.onclick = async () => {
       if (document.fullscreenElement) await document.exitFullscreen?.();
@@ -638,7 +664,7 @@
       // 더 정확한 인식이 필요하고 PC 성능이 충분하면 아래 주소의 lite 를 full 로 바꾸세요 (두 군데).
       const modelAssetPath = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
       const common = {
-        numPoses: 1,
+        numPoses: 3, // 여러 명을 감지한 뒤 가장 가까운(크게 보이는) 사람을 고릅니다
         runningMode: "VIDEO",
         minPoseDetectionConfidence: 0.5,
         minPosePresenceConfidence: 0.5,
@@ -866,17 +892,21 @@
         const result = landmarker.detectForVideo(video, now);
         fresh = true;
         if (result?.landmarks?.length){
-          pts = getKeyPoints(result.landmarks[0]);
+          pts = getKeyPoints(pickPlayer(result.landmarks));
           updateBodyScale(pts);
           updateTrackers(pts, now);
         } else {
           pts = null;
           resetTrackers();
+          pickedHip = null;
         }
       }
 
       // 배경 초기화
       ctx.clearRect(0,0,STAGE_W,STAGE_H);
+
+      // 지금 인식 중인 사람 표시 (준비 중에는 진하게, 게임 중에는 옅게)
+      if (pts) drawSkeleton(pts, awaitingReady);
 
       if (confetti.length) drawConfetti(dt);
 
@@ -936,6 +966,28 @@
       drawPopups(now);
 
       loopReq = requestAnimationFrame(loop);
+    }
+
+    // ===== 플레이어 선택: 카메라에 여러 명이 잡히면 가장 가까운(크게 보이는) 사람 =====
+    let pickedHip = null; // 직전에 고른 사람의 골반 중심 (정규화 좌표)
+    function hipOf(lm){ return { x:(lm[23].x + lm[24].x) / 2, y:(lm[23].y + lm[24].y) / 2 }; }
+    function sizeOf(lm, ar){
+      const sw = Math.hypot((lm[11].x - lm[12].x) * ar, lm[11].y - lm[12].y);
+      const torso = Math.hypot(((lm[11].x + lm[12].x) / 2 - (lm[23].x + lm[24].x) / 2) * ar, (lm[11].y + lm[12].y) / 2 - (lm[23].y + lm[24].y) / 2);
+      return torso + sw * 0.5;
+    }
+    function pickPlayer(all){
+      if (all.length === 1) { pickedHip = hipOf(all[0]); return all[0]; }
+      const ar = (video.videoWidth && video.videoHeight) ? video.videoWidth / video.videoHeight : 16 / 9;
+      let best = all[0], bestScore = -1;
+      for (const lm of all){
+        let score = sizeOf(lm, ar);
+        // 방금까지 따라가던 사람은 조금 우대 → 비슷한 크기의 두 사람 사이에서 왔다 갔다 하지 않도록
+        if (pickedHip){ const h = hipOf(lm); if (Math.hypot((h.x - pickedHip.x) * ar, h.y - pickedHip.y) < 0.15) score *= 1.25; }
+        if (score > bestScore){ best = lm; bestScore = score; }
+      }
+      pickedHip = hipOf(best);
+      return best;
     }
 
     // ===== 추적 & 판정 =====
@@ -1296,7 +1348,7 @@
 
     function getKeyPoints(lm){
       // BlazePose 인덱스
-      const NOSE=0, L_SH=11, R_SH=12, L_EL=13, R_EL=14, L_WR=15, R_WR=16, L_HIP=23, R_HIP=24, L_AN=27, R_AN=28, L_TOE=31, R_TOE=32;
+      const NOSE=0, L_SH=11, R_SH=12, L_EL=13, R_EL=14, L_WR=15, R_WR=16, L_HIP=23, R_HIP=24, L_KN=25, R_KN=26, L_AN=27, R_AN=28, L_TOE=31, R_TOE=32;
       const toScreen = (pt)=>({
         x:(1-pt.x)*STAGE_W,
         y: pt.y*STAGE_H,
@@ -1308,6 +1360,7 @@
         lElbow: toScreen(lm[L_EL]), rElbow: toScreen(lm[R_EL]),
         lHip: toScreen(lm[L_HIP]), rHip: toScreen(lm[R_HIP]),
         lWrist: toScreen(lm[L_WR]), rWrist: toScreen(lm[R_WR]),
+        lKnee: toScreen(lm[L_KN]), rKnee: toScreen(lm[R_KN]),
         lAnkle: toScreen(lm[L_AN]), rAnkle: toScreen(lm[R_AN]),
         lToe: toScreen(lm[L_TOE]), rToe: toScreen(lm[R_TOE])
       };
@@ -1408,6 +1461,22 @@
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(text, x + w/2, y + h/2 + 1);
+      ctx.restore();
+    }
+
+    const BONES = [['lShoulder','rShoulder'],['lShoulder','lElbow'],['lElbow','lWrist'],['rShoulder','rElbow'],['rElbow','rWrist'],
+                   ['lShoulder','lHip'],['rShoulder','rHip'],['lHip','rHip'],['lHip','lKnee'],['lKnee','lAnkle'],['rHip','rKnee'],['rKnee','rAnkle']];
+    function drawSkeleton(p, strong){
+      const S = uiScale(), ok = (pt) => pt && (pt.visibility ?? 1) >= VIS_MIN;
+      ctx.save();
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.strokeStyle = strong ? 'rgba(125,211,252,.95)' : 'rgba(125,211,252,.35)';
+      ctx.lineWidth = (strong ? 6 : 3) * S;
+      if (strong) { ctx.shadowColor = 'rgba(56,189,248,.8)'; ctx.shadowBlur = 12 * S; }
+      ctx.beginPath();
+      for (const [a, b] of BONES){ if (ok(p[a]) && ok(p[b])) { ctx.moveTo(p[a].x, p[a].y); ctx.lineTo(p[b].x, p[b].y); } }
+      ctx.stroke();
+      if (ok(p.nose)) { ctx.beginPath(); ctx.arc(p.nose.x, p.nose.y, Math.max(10 * S, bodyScale * 0.32), 0, Math.PI * 2); ctx.stroke(); }
       ctx.restore();
     }
 
