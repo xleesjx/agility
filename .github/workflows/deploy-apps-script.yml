@@ -1,0 +1,44 @@
+name: Apps Script 배포
+
+# apps-script 폴더가 바뀌어 main 에 올라오면 구글 Apps Script 에 코드를 올리고,
+# 기존 웹앱 배포(같은 /exec 주소)를 새 버전으로 갱신합니다.
+on:
+  push:
+    branches: [main]
+    paths: ['apps-script/**']
+  workflow_dispatch:
+
+env:
+  # 게임에 연결된 웹앱 주소(/macros/s/<여기>/exec)의 배포 ID
+  DEPLOYMENT_ID: AKfycbwa9_aqhAi-z66zoIdhaLe5koTIWp4nCdGZPdFSO_PKGxJ9NpHVPfD62Cz_UDSTUCbT
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps-script
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 설정 확인
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+        run: |
+          if grep -q SCRIPT_ID_HERE .clasp.json; then
+            echo "::error::apps-script/.clasp.json 에 스크립트 ID가 아직 없습니다 (README 참고)"; exit 1
+          fi
+          if [ -z "$CLASPRC_JSON" ]; then
+            echo "::error::저장소 Secrets 에 CLASPRC_JSON 이 없습니다 (README 참고)"; exit 1
+          fi
+          printf '%s' "$CLASPRC_JSON" > ~/.clasprc.json
+
+      - name: 코드 올리기 (clasp push)
+        run: npx -y @google/clasp@2.4.2 push -f
+
+      - name: 웹앱 배포 갱신 (같은 주소 유지)
+        run: npx -y @google/clasp@2.4.2 deploy -i "$DEPLOYMENT_ID" -d "GitHub ${GITHUB_SHA::7}"
