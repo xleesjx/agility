@@ -75,9 +75,10 @@ function doGet(e) {
   const data = JSON.stringify(list).replace(/</g, '\\u003c');
   const html = `<!doctype html><html lang="ko"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <title>${PAGE_TITLE}</title>
 <style>
-  body{margin:0;font-family:system-ui,"Malgun Gothic","Apple SD Gothic Neo",sans-serif;background:#101b2d;color:#f2f6fb}
+  body{margin:0;word-break:keep-all;-webkit-font-smoothing:antialiased;font-family:"Pretendard Variable",Pretendard,system-ui,"Malgun Gothic","Apple SD Gothic Neo",sans-serif;background:#101b2d;color:#f2f6fb}
   .wrap{max-width:760px;margin:0 auto;padding:24px 16px}
   h1{text-align:center;font-size:32px;margin:8px 0 6px}
   .sub{text-align:center;color:#98a2ab;margin-bottom:18px}

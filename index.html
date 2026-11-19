@@ -3,9 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>MediaPipe Reaction Drill – Game Mode</title>
+  <title>염포초 민첩성 게임</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
   <style>
-    html, body { height: 100%; margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; background:linear-gradient(145deg, #101b2d 0%, #17243a 48%, #0e1727 100%); color:#f2f6fb; }
+    html { background:#0e1727; }
+    html, body { min-height: 100%; margin: 0; font-family: "Pretendard Variable", Pretendard, system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif; color:#f2f6fb; }
+    body { background:linear-gradient(145deg, #101b2d 0%, #17243a 48%, #0e1727 100%) fixed; word-break:keep-all; overflow-wrap:anywhere; -webkit-font-smoothing:antialiased; letter-spacing:-0.01em; }
+    button, input, select { font-family:inherit; letter-spacing:inherit; }
+    h1, h2, h3, p, .result-msg, .my-rank, .notice { text-wrap:balance; }
     .wrap { max-width: 1360px; margin: 0 auto; padding: 20px; }
     header { position:relative; display:flex; align-items:center; justify-content:center; min-height:74px; }
     h1 { display:flex; align-items:center; justify-content:center; gap:14px; font-size: clamp(27px, 3vw, 40px); margin: 8px 0 18px; text-align:center; letter-spacing:-0.04em; color:#ffffff; }
@@ -23,21 +28,39 @@
     .control-panel { flex:1; min-width:310px; display:flex; }
     .hud { width:100%; display:grid; grid-template-rows:repeat(3, 1fr); gap:14px; }
     .btn { background:#2563eb; border:none; color:#fff; padding:10px 14px; border-radius:12px; font-weight:700; cursor:pointer; }
-    .hud .btn { width:100%; min-height:0; padding:16px 18px; border-radius:15px; font-size:22px; box-shadow:0 8px 18px rgba(3,10,25,.24); }
+    .hud .btn { width:100%; min-height:0; padding:16px 18px; border-radius:15px; font-size:22px; font-weight:800; box-shadow:0 8px 18px rgba(3,10,25,.24); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; transition:filter .15s, transform .15s; }
+    .hud .btn:not(:disabled):hover { filter:brightness(1.1); transform:translateY(-1px); }
+    .hud .btn .ico { font-size:28px; line-height:1; }
     .btn.secondary { background:#0f9f84; color:#fff; }
     .btn.ghost { background:#263750; border:1px solid #5d7393; color:#f1f5f9; }
     .btn:disabled { opacity:.45; cursor:not-allowed; box-shadow:none; }
-    .stat { background:#111d30; border:1px solid #31425c; padding:10px 12px; border-radius:12px; min-width:120px; }
-    .details-panel { margin-top:20px; }
+    .stats-grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; }
+    .stat { background:#111d30; border:1px solid #31425c; padding:12px 16px; border-radius:14px; display:flex; flex-direction:column; gap:4px; }
+    .stat > span { font-size:13px; font-weight:600; color:#98a8bd; }
+    .stat > b { font-size:26px; font-weight:800; font-variant-numeric:tabular-nums; }
+    .stat small { font-size:14px; font-weight:600; color:#98a8bd; }
+    .details-panel { margin-top:20px; padding:18px 20px 20px; }
+    .details-panel h3 { margin:0 0 12px; font-size:18px; font-weight:800; }
+    .details-panel h3.sec2 { margin-top:22px; }
+    .stage-placeholder { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; color:#8ea3bf; text-align:center; pointer-events:none; }
+    .stage-placeholder .ph-ico { font-size:52px; opacity:.85; }
+    .stage-placeholder b { font-size:22px; color:#dbe6f5; }
+    .stage-placeholder span { font-size:15px; }
     .flash { position:absolute; inset:0; pointer-events:none; border-radius:16px; }
     .flash.show-ok { background: rgba(0, 200, 120, .18); animation: fade .45s ease-out; }
     .flash.show-ng { background: rgba(235, 75, 75, .18); animation: fade .45s ease-out; }
     @keyframes fade { from { opacity:1 } to { opacity:0 } }
-    .notice { font-size:12px; color:#aeb5bc; margin-top:6px; }
+    .notice { font-size:13px; line-height:1.6; color:#a9b6c7; margin-top:6px; }
+    .notice b { color:#e2ebf6; font-weight:700; }
     .footer { margin-top:10px; font-size:12px; color:#98a2ab }
     .settings { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
-    .settings label { font-size:12px; color:#aeb5bc; display:block; margin-bottom:6px; }
-    .settings .field { background:#111d30; border:1px solid #31425c; border-radius:12px; padding:10px; }
+    .settings label { font-size:14px; font-weight:700; color:#dbe6f5; display:block; margin-bottom:10px; }
+    .settings label small { font-weight:500; color:#8ea3bf; font-size:12px; margin-left:4px; }
+    .settings .field { background:#111d30; border:1px solid #31425c; border-radius:14px; padding:14px 16px; }
+    .settings input[type=range] { width:100%; margin:0; accent-color:#2dd4a8; cursor:pointer; }
+    .settings .val { margin-top:6px; font-size:14px; color:#a9b6c7; }
+    .settings .val b { font-size:18px; color:#fff; font-variant-numeric:tabular-nums; }
+    .settings select { width:100%; padding:10px 36px 10px 12px; border:1px solid #426086; border-radius:10px; background:#0c1626 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23a9b6c7' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 12px center; color:#fff; font-size:15px; font-weight:600; appearance:none; -webkit-appearance:none; cursor:pointer; }
     .overlay-modal { position:absolute; inset:0; display:none; align-items:center; justify-content:center; background:rgba(3,8,20,.5); backdrop-filter: blur(2px); z-index: 10; }
     .fs-tip { font-size:12px; color:rgba(255,255,255,.62) }
     .float-score { position:absolute; color:#2bff88; font-weight:800; font-size: 55px; pointer-events:none; animation: floatUp .6s ease-out forwards; text-shadow: 0 2px 10px rgba(0,0,0,.35); }
@@ -117,7 +140,7 @@
     .start-guide { position:fixed; inset:0; display:none; align-items:center; justify-content:center; padding:24px; background:rgba(5,12,25,.72); backdrop-filter:blur(7px); z-index:1000; }
     .start-guide.show { display:flex; }
     .start-guide-card { position:relative; width:min(560px, calc(100vw - 48px)); box-sizing:border-box; overflow:hidden; padding:38px 42px 34px; border:2px solid rgba(255,255,255,.38); border-radius:28px; text-align:center; background:linear-gradient(140deg, #7549ee 0%, #2d71e8 45%, #10b99a 100%); color:#fff; box-shadow:0 24px 70px rgba(0,0,0,.45); }
-    .start-guide-card::before { content:""; position:absolute; width:190px; height:190px; top:-105px; right:-70px; border-radius:50%; background:rgba(255,211,78,.32); }
+    .start-guide-card::before { content:""; position:absolute; inset:0; border-radius:inherit; background:radial-gradient(circle at 85% 0%, rgba(255,255,255,.22), transparent 45%); pointer-events:none; }
     .start-guide-icon { position:relative; display:flex; align-items:center; justify-content:center; width:78px; height:78px; margin:0 auto 16px; border-radius:24px; background:rgba(255,255,255,.2); border:1px solid rgba(255,255,255,.42); font-size:43px; }
     .start-guide-card h2 { position:relative; margin:0 0 16px; font-size:clamp(30px, 4vw, 42px); letter-spacing:-.04em; }
     .start-guide-card p { position:relative; margin:0; font-size:clamp(19px, 2.2vw, 24px); font-weight:700; line-height:1.6; word-break:keep-all; }
@@ -138,7 +161,8 @@
       #stage { width:calc(100vw - 64px); height:auto; aspect-ratio:16 / 9; }
       .control-panel { width:calc(100% - 24px); }
       .hud { grid-template-columns:repeat(3, 1fr); grid-template-rows:1fr; }
-      .hud .btn { min-height:62px; font-size:17px; }
+      .hud .btn { min-height:62px; font-size:18px; flex-direction:row; }
+      .hud .btn .ico { font-size:22px; }
     }
     @media (max-width: 680px) {
       .wrap { padding:12px; }
@@ -146,6 +170,7 @@
       #stage { width:calc(100vw - 48px); }
       .hud { grid-template-columns:1fr; grid-template-rows:repeat(3, 1fr); }
       .settings { grid-template-columns:1fr; }
+      .stats-grid { grid-template-columns:1fr 1fr; }
       .result-score b { font-size:54px; }
       .result-stars { font-size:32px; }
     }
@@ -161,6 +186,7 @@
 
     <div class="row">
       <div id="stage" class="card">
+        <div id="stagePlaceholder" class="stage-placeholder"><div class="ph-ico">📷</div><b>카메라 시작 버튼을 눌러 주세요</b><span>카메라에서 약 2m 떨어져 전신이 보이게 서면 됩니다</span></div>
         <video id="video" playsinline muted></video>
         <canvas id="overlay"></canvas>
         <div id="flash" class="flash"></div>
@@ -196,7 +222,6 @@
               <button id="saveButton" class="btn-save" type="button">💾 기록 저장</button>
               <button id="restartBtn" class="btn-retry" type="button">저장 안 함</button>
             </div>
-            <div class="fs-tip" style="margin-top:8px">Tip: "전체 화면" 버튼으로 몰입도를 높이세요.</div>
           </div>
           <div class="rank-card">
             <div class="rank-title">🏆 염포초 TOP 10</div>
@@ -210,47 +235,49 @@
 
       <div class="card control-panel">
         <div class="hud">
-          <button id="startBtn" class="btn">카메라 시작</button>
-          <button id="stimBtn" class="btn secondary" disabled>게임 시작</button>
-          <button id="fsBtn" class="btn ghost">전체 화면</button>
+          <button id="startBtn" class="btn"><span class="ico" aria-hidden="true">📷</span>카메라 시작</button>
+          <button id="stimBtn" class="btn secondary" disabled><span class="ico" aria-hidden="true">▶</span>게임 시작</button>
+          <button id="fsBtn" class="btn ghost"><span class="ico" aria-hidden="true">⛶</span>전체 화면</button>
         </div>
       </div>
     </div>
 
     <div class="card details-panel">
-        <h3 style="margin:6px 0 10px">세션 통계</h3>
-        <div class="stat">점수 <b id="score">0</b></div>
-        <div class="stat" style="margin-top:8px">반응시간(avg) <b id="rtAvg">–</b> ms</div>
-        <div class="stat" style="margin-top:8px">성공률 <b id="acc">–</b></div>
-        <div class="stat" style="margin-top:8px">남은 시간 <b id="timeLeft">–</b> s</div>
+        <h3>📊 이번 판 기록</h3>
+        <div class="stats-grid">
+          <div class="stat"><span>점수</span><b id="score">0</b></div>
+          <div class="stat"><span>평균 반응시간</span><b><span id="rtAvg">–</span><small> ms</small></b></div>
+          <div class="stat"><span>성공률</span><b id="acc">–</b></div>
+          <div class="stat"><span>남은 시간</span><b><span id="timeLeft">–</span><small> 초</small></b></div>
+        </div>
 
-        <h3 style="margin:16px 0 6px">설정</h3>
+        <h3 class="sec2">⚙️ 설정</h3>
         <div class="settings">
           <div class="field">
-            <label>게임 시간 (초) – 10초 단위</label>
+            <label>게임 시간 <small>10초 단위</small></label>
             <input id="optTime" type="range" min="10" max="180" step="10" value="60"/>
-            <div>선택: <b id="optTimeVal">60</b> s</div>
+            <div class="val"><b id="optTimeVal">60</b> 초</div>
           </div>
           <div class="field">
-            <label>난이도: 타겟 반경 (px, 기본 화면 960px 기준)</label>
+            <label>타겟 크기 <small>작을수록 어려움 · 960px 화면 기준</small></label>
             <input id="optRadius" type="range" min="40" max="140" step="10" value="90"/>
-            <div>선택: <b id="optRadiusVal">90</b> px</div>
+            <div class="val">반지름 <b id="optRadiusVal">90</b> px</div>
           </div>
           <div class="field">
-            <label>난이도: 타겟 제한시간 (ms) – 빨라질수록 어려움</label>
+            <label>타겟 제한시간 <small>짧을수록 어려움</small></label>
             <input id="optTimeout" type="range" min="800" max="4000" step="200" value="2500"/>
-            <div>선택: <b id="optTimeoutVal">2500</b> ms</div>
+            <div class="val"><b id="optTimeoutVal">2500</b> ms</div>
           </div>
           <div class="field">
-            <label>신체 부위 그룹</label>
+            <label>터치할 신체 부위</label>
             <select id="bodyGroup">
               <option value="hands">양손 (손바닥 위치)</option>
               <option value="feet">양발 (발끝 쪽)</option>
             </select>
-            <div class="notice">히트 판정은 선택한 그룹의 <span class="badge">좌/우</span> 어느 쪽이든 타겟에 닿으면 성공</div>
+            <div class="notice">왼쪽·오른쪽 어느 쪽이든 타겟에 닿으면 성공</div>
           </div>
           <div class="field">
-            <label>준비 동작(전신 인식)</label>
+            <label>준비 동작 <small>전신 인식</small></label>
             <div class="notice">게임 시작 후 <b>머리부터 발목까지 전신이 약 2초간 인식</b>되면 타이머가 시작됩니다.</div>
           </div>
           <div class="field">
@@ -261,7 +288,7 @@
             </div>
           </div>
         </div>
-        <div class="notice" style="margin-top:8px">원형 타겟이 나타나면 선택한 신체 부위로 원 안에 들어가세요. (거울 모드)</div>
+        <div class="notice" style="margin-top:12px">원형 타겟이 나타나면 선택한 신체 부위로 원 안에 들어가세요. 화면은 거울처럼 좌우가 바뀌어 보입니다.</div>
     </div>
   </div>
 
@@ -298,6 +325,7 @@
     const VIS_MIN = 0.08;       // 랜드마크 최소 신뢰도 (2m 거리에서는 낮게 나와서 완화)
     const SPAWN_GAP = 0.10;     // 타겟이 손/발에서 최소 이만큼(화면 너비 비율) 떨어져서 생성
 
+    const CANVAS_FONT = '"Pretendard Variable", Pretendard, system-ui, "Malgun Gothic", sans-serif';
     const video = document.getElementById('video');
     const stage = document.getElementById('stage');
     const canvas = document.getElementById('overlay');
@@ -465,6 +493,9 @@
     // 입력칸에서 Enter: 학반 → 이름 → 시작
     studentId.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); studentName.focus(); } });
     studentName.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); startGuideConfirm.click(); } });
+    // → : 학반 칸 끝에서 이름 칸으로,  ← : 이름 칸 맨 앞에서 학반 칸으로 (Tab / Shift+Tab 도 동일)
+    studentId.addEventListener('keydown', (e) => { if (e.key === 'ArrowRight' && !e.isComposing && studentId.selectionStart === studentId.value.length) { e.preventDefault(); studentName.focus(); studentName.setSelectionRange(0, 0); } });
+    studentName.addEventListener('keydown', (e) => { if (e.key === 'ArrowLeft' && !e.isComposing && studentName.selectionStart === 0 && studentName.selectionEnd === 0) { e.preventDefault(); studentId.focus(); const n = studentId.value.length; studentId.setSelectionRange(n, n); } });
 
     // 저장 안 함 / 다음 학생: 결과 창을 닫고 다음 학생 등록 창 열기 (학반·이름 칸 비움)
     restartBtn.onclick = () => {
@@ -483,6 +514,7 @@
     };
 
     window.addEventListener('resize', () => { resizeStage(); });
+    video.addEventListener('playing', () => { document.getElementById('stagePlaceholder').style.display = 'none'; });
     document.addEventListener('fullscreenchange', () => { onFullscreenUi(); setTimeout(resizeStage, 80); });
 
     // ===== 전체화면 전용 컨트롤 (UI) =====
@@ -1043,7 +1075,7 @@
       }
 
       ctx.fillStyle = '#ffffff';
-      ctx.font = `900 ${Math.max(14, r * 0.3 * (1 + prox * 0.15))}px system-ui, "Malgun Gothic", sans-serif`;
+      ctx.font = `900 ${Math.max(14, r * 0.3 * (1 + prox * 0.15))}px ${CANVAS_FONT}`;
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.shadowColor = 'rgba(0,0,0,.5)'; ctx.shadowBlur = 6;
       ctx.fillText('TOUCH', tgt.x, tgt.y);
@@ -1136,7 +1168,7 @@
         if (k >= 1){ popups.splice(i, 1); continue; }
         const sc = k < 0.25 ? easeOutBack(k / 0.25) : 1;
         ctx.globalAlpha = k < 0.6 ? 1 : 1 - (k - 0.6) / 0.4;
-        ctx.font = `900 ${Math.max(10, p.size * S * sc)}px system-ui, "Malgun Gothic", sans-serif`;
+        ctx.font = `900 ${Math.max(10, p.size * S * sc)}px ${CANVAS_FONT}`;
         const y = p.y - 34 * S * k;
         ctx.lineWidth = Math.max(3, p.size * S * 0.12); ctx.strokeStyle = 'rgba(10,16,32,.8)';
         ctx.strokeText(p.text, p.x, y);
@@ -1179,7 +1211,7 @@
     function drawHud(now){
       const S = uiScale();
       const h = 42 * S, padX = 16 * S, gap = 10 * S, y = 16 * S + hudTopOffset();
-      const font = `800 ${20 * S}px system-ui, "Malgun Gothic", sans-serif`;
+      const font = `800 ${20 * S}px ${CANVAS_FONT}`;
       ctx.save();
       ctx.font = font; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
 
@@ -1204,7 +1236,7 @@
       // 콤보
       if (combo >= 2){
         const b = Math.max(0, 1 - (now - comboBumpAt) / 260);
-        ctx.font = `900 ${(30 + b * 10) * S}px system-ui, "Malgun Gothic", sans-serif`;
+        ctx.font = `900 ${(30 + b * 10) * S}px ${CANVAS_FONT}`;
         ctx.textAlign = 'right'; ctx.lineJoin = 'round';
         ctx.lineWidth = 6 * S; ctx.strokeStyle = 'rgba(10,16,32,.8)';
         const cy = y + h + 28 * S;
@@ -1224,7 +1256,7 @@
         const frac = ((roundEndAt - now) / 1000) % 1;
         ctx.globalAlpha = 0.16 + 0.22 * frac;
         ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center';
-        ctx.font = `900 ${220 * S * (1 + 0.12 * frac)}px system-ui, sans-serif`;
+        ctx.font = `900 ${220 * S * (1 + 0.12 * frac)}px ${CANVAS_FONT}`;
         ctx.fillText(String(timeLeftSec), STAGE_W / 2, STAGE_H / 2);
       }
       ctx.restore();
@@ -1240,7 +1272,7 @@
 
       ctx.save();
       ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.lineJoin = 'round';
-      ctx.font = `bold ${clamp(STAGE_W * 0.06, 24, 60)}px system-ui, "Malgun Gothic", sans-serif`;
+      ctx.font = `bold ${clamp(STAGE_W * 0.06, 24, 60)}px ${CANVAS_FONT}`;
       const label = k > 0 ? `전신 인식 중… ${Math.max(1, Math.ceil(2 * (1 - k)))}` : '전신이 보이도록 서 주세요';
       ctx.lineWidth = 6; ctx.strokeStyle = 'rgba(10,16,32,.75)';
       ctx.strokeText(label, STAGE_W / 2, y - 14);
@@ -1340,7 +1372,7 @@
     function drawPlayWarning(text){
       ctx.save();
       const S = uiScale();
-      const w = Math.min(760, STAGE_W * 0.82), h = Math.max(54, Math.min(82, STAGE_H * 0.14));
+      const w = Math.min(680, STAGE_W * 0.6), h = Math.max(50, Math.min(76, STAGE_H * 0.13));
       const x = (STAGE_W - w) / 2;
       const y = 16 * S + 42 * S + 14 * S + hudTopOffset(); // 상단 HUD(점수·시간) 바로 아래
 
@@ -1354,7 +1386,7 @@
       ctx.stroke();
 
       ctx.fillStyle = '#ffffff';
-      ctx.font = `bold ${Math.max(18, Math.min(34, STAGE_W * 0.035))}px system-ui, "Malgun Gothic", sans-serif`;
+      ctx.font = `700 ${Math.max(16, Math.min(30, STAGE_W * 0.028))}px ${CANVAS_FONT}`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(text, STAGE_W/2, y + h/2);
@@ -1372,7 +1404,7 @@
       ctx.fill();
 
       ctx.fillStyle = '#fff';
-      ctx.font = `bold ${18 * S}px system-ui, "Malgun Gothic", sans-serif`;
+      ctx.font = `bold ${18 * S}px ${CANVAS_FONT}`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(text, x + w/2, y + h/2 + 1);
