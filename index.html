@@ -122,7 +122,10 @@
     .start-guide-card h2 { position:relative; margin:0 0 16px; font-size:clamp(30px, 4vw, 42px); letter-spacing:-.04em; }
     .start-guide-card p { position:relative; margin:0; font-size:clamp(19px, 2.2vw, 24px); font-weight:700; line-height:1.6; word-break:keep-all; }
     .start-guide-card strong { color:#fff3a3; font-size:1.08em; }
-    .start-guide-confirm { position:relative; width:100%; margin-top:28px; padding:17px 24px; border:0; border-radius:16px; background:#ffe36e; color:#17213a; font-size:22px; font-weight:900; cursor:pointer; box-shadow:0 8px 0 #d8af2f, 0 14px 24px rgba(16,25,50,.25); }
+    .guide-inputs { position:relative; margin-top:4px; }
+    .guide-inputs input { padding:15px 16px; font-size:21px; border-radius:14px; }
+    .player-tag { margin-top:10px; padding:10px 12px; border-radius:14px; background:rgba(8,16,40,.34); border:1px solid rgba(255,255,255,.22); font-size:20px; font-weight:900; }
+    .start-guide-confirm { position:relative; width:100%; margin-top:22px; padding:17px 24px; border:0; border-radius:16px; background:#ffe36e; color:#17213a; font-size:22px; font-weight:900; cursor:pointer; box-shadow:0 8px 0 #d8af2f, 0 14px 24px rgba(16,25,50,.25); }
     .start-guide-confirm:hover { background:#fff09d; transform:translateY(-1px); }
     .start-guide-confirm:active { transform:translateY(5px); box-shadow:0 3px 0 #d8af2f; }
     @media (max-width: 1180px) {
@@ -188,13 +191,10 @@
               <div class="tile"><span class="lbl">🎯 성공률</span><b id="finalAcc">–</b></div>
               <div class="tile"><span class="lbl">🔥 최대 콤보</span><b id="finalCombo">0</b></div>
             </div>
-            <div class="save-row">
-              <input id="studentId" type="text" placeholder="학반 (예: 4-3)" autocomplete="off">
-              <input id="studentName" type="text" placeholder="이름 (예: 김가람)" autocomplete="off">
-            </div>
+            <div id="playerTag" class="player-tag"></div>
             <div class="result-actions">
               <button id="saveButton" class="btn-save" type="button">💾 기록 저장</button>
-              <button id="restartBtn" class="btn-retry" type="button">⏭ 저장 안 하고 넘기기</button>
+              <button id="restartBtn" class="btn-retry" type="button">저장 안 함</button>
             </div>
             <div class="fs-tip" style="margin-top:8px">Tip: "전체 화면" 버튼으로 몰입도를 높이세요.</div>
           </div>
@@ -267,11 +267,15 @@
 
   <div id="startGuide" class="start-guide" role="dialog" aria-modal="true" aria-labelledby="startGuideTitle">
     <div class="start-guide-card">
-      <div class="start-guide-icon" aria-hidden="true">⚡</div>
-      <h2 id="startGuideTitle">준비 자세 안내</h2>
-      <p><strong>카메라에 전신이 보이도록 2초간 서 있으면</strong><br>게임이 시작됩니다.</p>
-      <p style="margin-top:10px; font-size:17px; font-weight:600; opacity:.92;">발을 모으거나 양손을 내릴 필요 없이 편하게 서 있어도 됩니다.</p>
-      <button id="startGuideConfirm" class="start-guide-confirm" type="button">확인하고 준비하기</button>
+      <div class="start-guide-icon" aria-hidden="true">🙋</div>
+      <h2 id="startGuideTitle">누가 도전하나요?</h2>
+      <div class="save-row guide-inputs">
+        <input id="studentId" type="text" placeholder="학반 (예: 4-3)" autocomplete="off">
+        <input id="studentName" type="text" placeholder="이름 (예: 김가람)" autocomplete="off">
+      </div>
+      <p style="margin-top:18px"><strong>전신이 보이게 2초간 서 있으면</strong><br>게임이 시작됩니다.</p>
+      <p style="margin-top:8px; font-size:16px; font-weight:600; opacity:.92;">발을 모으거나 양손을 내릴 필요 없이 편하게 서 있어도 됩니다.</p>
+      <button id="startGuideConfirm" class="start-guide-confirm" type="button">▶ 준비 완료! 시작하기</button>
     </div>
   </div>
 
@@ -447,18 +451,23 @@
       if (spawnTimer) { clearTimeout(spawnTimer); spawnTimer = null; }
       if (roundTimerId) { clearInterval(roundTimerId); roundTimerId = null; }
       startGuide.classList.add('show');
-      startGuideConfirm.focus();
+      (studentId.value.trim() ? studentName : studentId).focus();
     };
 
+    // 시작 전에 학반·이름을 입력받고, 확인하면 전신 인식 대기로 넘어갑니다.
     startGuideConfirm.onclick = () => {
       ensureAudio();
+      if (!studentId.value.trim()) { alert('학반을 입력하세요! (예: 4-3)'); studentId.focus(); return; }
+      if (!studentName.value.trim()) { alert('이름을 입력하세요!'); studentName.focus(); return; }
       startGuide.classList.remove('show');
       awaitingReady = true; readyStart = 0; lastReadyTick = 0;
     };
+    // 입력칸에서 Enter: 학반 → 이름 → 시작
+    studentId.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); studentName.focus(); } });
+    studentName.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); startGuideConfirm.click(); } });
 
-    // 저장 안 하고 넘기기 / 다음 학생: 결과 창을 닫고 다음 학생 준비 (학반·이름 칸 비움)
+    // 저장 안 함 / 다음 학생: 결과 창을 닫고 다음 학생 등록 창 열기 (학반·이름 칸 비움)
     restartBtn.onclick = () => {
-      if (!saveDone && !confirm('기록을 저장하지 않고 다음 학생으로 넘어갈까요?')) return;
       gameOver.style.display = 'none';
       confetti.length = 0;
       studentId.value = ''; studentName.value = '';
@@ -575,7 +584,7 @@
             : `이번 점수 <b>${myScore}</b>점`;
         } else {
           const expect = 1 + list.filter(r => r.s > myScore).length;
-          myRank.innerHTML = `이번 점수 <b>${myScore}</b>점이면 현재 <b>${expect}위</b>!<br><span style="font-size:13px;opacity:.8">💾 기록을 저장하면 순위표에 올라가요</span>`;
+          myRank.innerHTML = `이번 점수 <b>${myScore}</b>점이면 현재 <b>${expect}위</b>!<br><span style="font-size:13px;opacity:.8">💾 기록 저장을 누르면 순위표에 올라가요</span>`;
         }
       } catch (err) {
         if (req !== rankReq) return;
@@ -684,6 +693,7 @@
       fitResultLayout();
       loadRanking(null); // 결과 창 오른쪽에 TOP 10 + 예상 순위 표시
       document.getElementById('fsStartLabel').textContent = '다음 학생';
+      document.getElementById('playerTag').textContent = `🙋 ${studentId.value.trim()} ${studentName.value.trim()}`;
     }
 
     function countUp(el, to, dur){
@@ -699,9 +709,9 @@
     let saveDone = false; // 이번 결과를 저장했는지 (저장 후엔 '다음 학생' 모드)
     function setNextMode(on){
       saveDone = on;
-      // 저장 전: [💾 기록 저장] [⏭ 저장 안 하고 넘기기]  →  저장 후: [▶ 다음 학생] 하나만
+      // 저장 전: [💾 기록 저장] [저장 안 함]  →  저장 후: [▶ 다음 학생] 하나만
       saveButton.style.display = on ? 'none' : '';
-      restartBtn.textContent = on ? '▶ 다음 학생' : '⏭ 저장 안 하고 넘기기';
+      restartBtn.textContent = on ? '▶ 다음 학생' : '저장 안 함';
       restartBtn.classList.toggle('next', on);
     }
     function resetSaveUi(){
