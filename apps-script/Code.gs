@@ -29,6 +29,7 @@ function doPost(e) {
   lock.waitLock(10000); // 여러 학생이 동시에 저장해도 줄이 섞이지 않도록
   try {
     const r = JSON.parse(e.postData.contents);
+    if (r.action === 'reset') return ContentService.createTextOutput(resetRecords_(r.password));
     getSheet_().appendRow([
       r.timestamp || new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }),
       "'" + String(r.id || '').trim(),   // 학반이 날짜/숫자로 바뀌지 않도록 텍스트로 저장
@@ -44,6 +45,24 @@ function doPost(e) {
   } finally {
     lock.releaseLock();
   }
+}
+
+/**
+ * 기록 초기화 (선생님용): 지금까지의 기록을 '백업_날짜시각' 탭으로 옮기고 '기록' 탭을 비웁니다.
+ * 비밀번호는 코드가 아니라 Apps Script → 프로젝트 설정 → 스크립트 속성 의 ADMIN_PASSWORD 에 저장합니다.
+ */
+function resetRecords_(password) {
+  const saved = PropertiesService.getScriptProperties().getProperty('ADMIN_PASSWORD');
+  if (!saved) return 'NO_PASSWORD_SET';
+  if (String(password || '') !== saved) return 'WRONG_PASSWORD';
+  const sh = getSheet_();
+  const rows = sh.getLastRow() - 1;
+  if (rows <= 0) return 'RESET_OK 0';
+  const stamp = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd HH:mm:ss');
+  const backup = sh.copyTo(sh.getParent()).setName('백업_' + stamp);
+  backup.setTabColor('#9aa4b2');
+  sh.deleteRows(2, rows);
+  return 'RESET_OK ' + rows;
 }
 
 /** 학생별 최고 점수 목록 (점수 내림차순, 같은 점수는 같은 순위) */
